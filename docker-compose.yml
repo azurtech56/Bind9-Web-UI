@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Backend API Node.js
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dns-manager-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - BIND9_ZONES_PATH=/etc/bind/zones
+      - BIND9_CONFIG_PATH=/etc/bind/named.conf
+    volumes:
+      # Montage des fichiers BIND9 du serveur hôte
+      - /etc/bind:/etc/bind:rw
+      - /var/lib/bind:/var/lib/bind:rw
+    networks:
+      - dns-network
+    restart: unless-stopped
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dns-manager-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - backend
+    networks:
+      - dns-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy (optionnel, pour production)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: dns-manager-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Pour HTTPS, ajouter les certificats SSL
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - dns-network
+    restart: unless-stopped
+
+networks:
+  dns-network:
+    driver: bridge
