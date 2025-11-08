@@ -3,302 +3,27 @@ import cors from 'cors';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ServersManager } from './serversManager.js';
+import { SSHManager } from './sshManager.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configuration des chemins BIND9
-const BIND9_ZONES_PATH = process.env.BIND9_ZONES_PATH || '/etc/bind/zones';
-const BIND9_CONFIG_PATH = process.env.BIND9_CONFIG_PATH || '/etc/bind/named.conf';
+// Gestionnaires
+const serversManager = new ServersManager('servers.config.json');
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // ============================================
-// ROUTES API
-// ============================================
-
-// GET - Lister toutes les zones DNS
-app.get('/api/zones', async (req, res) => {
-  try {
-    const files = await fs.readdir(BIND9_ZONES_PATH);
-    const zones = files
-      .filter(f => !f.startsWith('.') && !f.endsWith('.jnl'))
-      .map(zone => ({
-        name: zone,
-        path: path.join(BIND9_ZONES_PATH, zone)
-      }));
-
-    res.json({
-      success: true,
-      data: zones,
-      count: zones.length
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// GET - Récupérer les détails d'une zone (enregistrements DNS)
-app.get('/api/zones/:zoneName', async (req, res) => {
-  try {
-    const { zoneName } = req.params;
-    const zonePath = path.join(BIND9_ZONES_PATH, zoneName);
-
-    // Vérifier que le fichier existe et est dans le répertoire autorisé
-    if (!zonePath.startsWith(BIND9_ZONES_PATH)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Accès refusé'
-      });
-    }
-
-    const content = await fs.readFile(zonePath, 'utf-8');
-    const records = parseZoneFile(content);
-
-    res.json({
-      success: true,
-      data: {
-        zone: zoneName,
-        records: records,
-        rawContent: content
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// POST - Créer une nouvelle zone
-app.post('/api/zones', async (req, res) => {
-  try {
-    const { zoneName, soaEmail, serial } = req.body;
-
-    if (!zoneName || !soaEmail) {
-      return res.status(400).json({
-        success: false,
-        error: 'zoneName et soaEmail requis'
-      });
-    }
-
-    const zonePath = path.join(BIND9_ZONES_PATH, zoneName);
-
-    // Vérifier que la zone n'existe pas
-    if (await fs.pathExists(zonePath)) {
-      return res.status(400).json({
-        success: false,
-        error: 'La zone existe déjà'
-      });
-    }
-
-    // Créer le fichier de zone avec structure de base
-    const currentSerial = serial || Math.floor(Date.now() / 1000);
-    const zoneContent = `$TTL 3600
-@   IN  SOA     ns1.${zoneName}. ${soaEmail}. (
-                ${currentSerial}  ; serial
-                3600           ; refresh
-                1800           ; retry
-                604800         ; expire
-                86400 )        ; minimum
-
-@   IN  NS      ns1.${zoneName}.
-@   IN  A       192.168.1.1
-
-ns1 IN  A       192.168.1.1
-`;
-
-    await fs.writeFile(zonePath, zoneContent);
-
-    res.json({
-      success: true,
-      message: `Zone ${zoneName} créée avec succès`,
-      data: { zoneName }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// PUT - Modifier un enregistrement DNS
-app.put('/api/zones/:zoneName/records/:recordId', async (req, res) => {
-  try {
-    const { zoneName, recordId } = req.params;
-    const { name, type, value, ttl } = req.body;
-
-    const zonePath = path.join(BIND9_ZONES_PATH, zoneName);
-
-    if (!zonePath.startsWith(BIND9_ZONES_PATH)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Accès refusé'
-      });
-    }
-
-    let content = await fs.readFile(zonePath, 'utf-8');
-    const records = parseZoneFile(content);
-
-    // Trouver et modifier l'enregistrement
-    const recordIndex = records.findIndex(r => r.id === recordId);
-    if (recordIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        error: 'Enregistrement non trouvé'
-      });
-    }
-
-    records[recordIndex] = {
-      ...records[recordIndex],
-      name: name || records[recordIndex].name,
-      type: type || records[recordIndex].type,
-      value: value || records[recordIndex].value,
-      ttl: ttl || records[recordIndex].ttl
-    };
-
-    // Reconstruire le fichier de zone
-    const newContent = rebuildZoneFile(content, records);
-    await fs.writeFile(zonePath, newContent);
-
-    res.json({
-      success: true,
-      message: 'Enregistrement modifié avec succès',
-      data: records[recordIndex]
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// POST - Ajouter un enregistrement DNS
-app.post('/api/zones/:zoneName/records', async (req, res) => {
-  try {
-    const { zoneName } = req.params;
-    const { name, type, value, ttl = 3600 } = req.body;
-
-    if (!name || !type || !value) {
-      return res.status(400).json({
-        success: false,
-        error: 'name, type et value requis'
-      });
-    }
-
-    const zonePath = path.join(BIND9_ZONES_PATH, zoneName);
-
-    if (!zonePath.startsWith(BIND9_ZONES_PATH)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Accès refusé'
-      });
-    }
-
-    let content = await fs.readFile(zonePath, 'utf-8');
-    const lines = content.split('\n');
-
-    // Ajouter le nouvel enregistrement avant la dernière ligne
-    const newRecord = `${name.padEnd(20)} IN  ${type.padEnd(10)} ${value}`;
-    lines.splice(lines.length - 1, 0, newRecord);
-
-    await fs.writeFile(zonePath, lines.join('\n'));
-
-    res.json({
-      success: true,
-      message: 'Enregistrement ajouté avec succès',
-      data: { name, type, value, ttl }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// DELETE - Supprimer un enregistrement DNS
-app.delete('/api/zones/:zoneName/records/:recordId', async (req, res) => {
-  try {
-    const { zoneName, recordId } = req.params;
-    const zonePath = path.join(BIND9_ZONES_PATH, zoneName);
-
-    if (!zonePath.startsWith(BIND9_ZONES_PATH)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Accès refusé'
-      });
-    }
-
-    let content = await fs.readFile(zonePath, 'utf-8');
-    const records = parseZoneFile(content);
-
-    // Supprimer l'enregistrement
-    const newRecords = records.filter(r => r.id !== recordId);
-
-    if (newRecords.length === records.length) {
-      return res.status(404).json({
-        success: false,
-        error: 'Enregistrement non trouvé'
-      });
-    }
-
-    const newContent = rebuildZoneFile(content, newRecords);
-    await fs.writeFile(zonePath, newContent);
-
-    res.json({
-      success: true,
-      message: 'Enregistrement supprimé avec succès'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// DELETE - Supprimer une zone
-app.delete('/api/zones/:zoneName', async (req, res) => {
-  try {
-    const { zoneName } = req.params;
-    const zonePath = path.join(BIND9_ZONES_PATH, zoneName);
-
-    if (!zonePath.startsWith(BIND9_ZONES_PATH)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Accès refusé'
-      });
-    }
-
-    await fs.remove(zonePath);
-
-    res.json({
-      success: true,
-      message: `Zone ${zoneName} supprimée avec succès`
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// ============================================
 // UTILITAIRES
 // ============================================
 
-// Parser simple pour les fichiers de zone DNS
+/**
+ * Parser simple pour les fichiers de zone DNS
+ */
 function parseZoneFile(content) {
   const lines = content.split('\n');
   const records = [];
@@ -307,12 +32,10 @@ function parseZoneFile(content) {
   lines.forEach(line => {
     line = line.trim();
 
-    // Ignorer les commentaires et lignes vides
     if (!line || line.startsWith(';') || line.startsWith('$')) {
       return;
     }
 
-    // Ignorer les blocs SOA multi-lignes
     if (line.includes('SOA') && !line.includes(';')) {
       return;
     }
@@ -321,7 +44,6 @@ function parseZoneFile(content) {
     if (parts.length >= 4) {
       const [name, , type, value] = parts;
 
-      // Vérifier que c'est un type DNS valide
       if (['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SOA', 'SRV'].includes(type)) {
         records.push({
           id: `record-${id++}`,
@@ -337,12 +59,13 @@ function parseZoneFile(content) {
   return records;
 }
 
-// Reconstruire le fichier de zone
+/**
+ * Reconstruire le fichier de zone
+ */
 function rebuildZoneFile(originalContent, records) {
   const lines = originalContent.split('\n');
   const newLines = [];
 
-  // Garder le header (SOA, NS, etc.)
   let soaFound = false;
   for (const line of lines) {
     if (line.includes('SOA') || line.startsWith('$')) {
@@ -356,7 +79,6 @@ function rebuildZoneFile(originalContent, records) {
     }
   }
 
-  // Ajouter les nouveaux enregistrements
   records.forEach(record => {
     newLines.push(
       `${record.name.padEnd(20)} IN  ${record.type.padEnd(10)} ${record.value}`
@@ -366,6 +88,475 @@ function rebuildZoneFile(originalContent, records) {
   return newLines.join('\n');
 }
 
+/**
+ * Obtenir le gestionnaire de fichiers (local ou SSH)
+ */
+async function getFileManager(serverId) {
+  const server = serversManager.getServerById(serverId);
+  if (!server) {
+    throw new Error(`Serveur ${serverId} non trouvé`);
+  }
+
+  if (serversManager.isLocalServer(serverId)) {
+    // Serveur local
+    return {
+      readFile: (filePath) => fs.readFile(filePath, 'utf-8'),
+      writeFile: (filePath, content) => fs.writeFile(filePath, content),
+      readdir: (dirPath) => fs.readdir(dirPath),
+      pathExists: (filePath) => fs.pathExists(filePath),
+      remove: (filePath) => fs.remove(filePath),
+      disconnect: () => Promise.resolve(),
+    };
+  } else {
+    // Serveur distant via SSH
+    const ssh = new SSHManager(server);
+    await ssh.connect();
+    return {
+      readFile: (filePath) => ssh.readFile(filePath),
+      writeFile: (filePath, content) => ssh.writeFile(filePath, content),
+      readdir: (dirPath) => ssh.listFiles(dirPath).then(files => files.map(f => f.name)),
+      pathExists: async (filePath) => {
+        try {
+          await ssh.readFile(filePath);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      remove: async (filePath) => {
+        await ssh.executeCommand(`rm -rf "${filePath}"`);
+      },
+      disconnect: () => ssh.disconnect(),
+    };
+  }
+}
+
+// ============================================
+// ROUTES API - SERVEURS
+// ============================================
+
+// GET - Lister tous les serveurs
+app.get('/api/servers', (req, res) => {
+  try {
+    const servers = serversManager.getAllServers();
+    const safeServers = servers.map(s => ({
+      id: s.id,
+      name: s.name,
+      host: s.host,
+      port: s.port,
+      enabled: s.enabled,
+      description: s.description,
+      isLocal: serversManager.isLocalServer(s.id),
+    }));
+
+    res.json({
+      success: true,
+      data: safeServers,
+      count: safeServers.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// GET - Obtenir un serveur
+app.get('/api/servers/:serverId', (req, res) => {
+  try {
+    const server = serversManager.getServerById(req.params.serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: server.id,
+        name: server.name,
+        host: server.host,
+        port: server.port,
+        username: server.username,
+        bindZonesPath: server.bindZonesPath,
+        bindConfigPath: server.bindConfigPath,
+        enabled: server.enabled,
+        description: server.description,
+        isLocal: serversManager.isLocalServer(server.id),
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST - Ajouter un serveur
+app.post('/api/servers', async (req, res) => {
+  try {
+    const newServer = serversManager.addServer(req.body);
+
+    res.json({
+      success: true,
+      message: `Serveur ${newServer.name} ajouté`,
+      data: {
+        id: newServer.id,
+        name: newServer.name,
+        host: newServer.host
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// PUT - Modifier un serveur
+app.put('/api/servers/:serverId', (req, res) => {
+  try {
+    const updated = serversManager.updateServer(req.params.serverId, req.body);
+
+    res.json({
+      success: true,
+      message: 'Serveur modifié',
+      data: {
+        id: updated.id,
+        name: updated.name,
+        host: updated.host
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// DELETE - Supprimer un serveur
+app.delete('/api/servers/:serverId', (req, res) => {
+  try {
+    serversManager.deleteServer(req.params.serverId);
+
+    res.json({
+      success: true,
+      message: 'Serveur supprimé'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST - Tester la connexion à un serveur
+app.post('/api/servers/:serverId/test', async (req, res) => {
+  try {
+    const server = serversManager.getServerById(req.params.serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    if (serversManager.isLocalServer(req.params.serverId)) {
+      res.json({
+        success: true,
+        message: 'Serveur local',
+        data: { connected: true }
+      });
+    } else {
+      const ssh = new SSHManager(server);
+      const result = await ssh.testConnection();
+
+      res.json({
+        success: result.success,
+        message: result.message || result.error,
+        data: { connected: result.success }
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      data: { connected: false }
+    });
+  }
+});
+
+// ============================================
+// ROUTES API - ZONES
+// ============================================
+
+// GET - Lister les zones d'un serveur
+app.get('/api/servers/:serverId/zones', async (req, res) => {
+  let manager = null;
+  try {
+    const server = serversManager.getServerById(req.params.serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    manager = await getFileManager(req.params.serverId);
+    const files = await manager.readdir(server.bindZonesPath);
+    const zones = files
+      .filter(f => !f.startsWith('.') && !f.endsWith('.jnl'))
+      .map(zone => ({
+        name: zone,
+        server: req.params.serverId
+      }));
+
+    res.json({
+      success: true,
+      data: zones,
+      count: zones.length,
+      server: req.params.serverId
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    if (manager) await manager.disconnect();
+  }
+});
+
+// GET - Récupérer les enregistrements d'une zone
+app.get('/api/servers/:serverId/zones/:zoneName', async (req, res) => {
+  let manager = null;
+  try {
+    const { serverId, zoneName } = req.params;
+    const server = serversManager.getServerById(serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    manager = await getFileManager(serverId);
+    const zonePath = path.join(server.bindZonesPath, zoneName);
+    const content = await manager.readFile(zonePath);
+    const records = parseZoneFile(content);
+
+    res.json({
+      success: true,
+      data: {
+        zone: zoneName,
+        server: serverId,
+        records: records,
+        rawContent: content
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    if (manager) await manager.disconnect();
+  }
+});
+
+// POST - Créer une zone
+app.post('/api/servers/:serverId/zones', async (req, res) => {
+  let manager = null;
+  try {
+    const { serverId } = req.params;
+    const { zoneName, soaEmail, serial } = req.body;
+
+    if (!zoneName || !soaEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'zoneName et soaEmail requis'
+      });
+    }
+
+    const server = serversManager.getServerById(serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    manager = await getFileManager(serverId);
+    const zonePath = path.join(server.bindZonesPath, zoneName);
+
+    if (await manager.pathExists(zonePath)) {
+      return res.status(400).json({
+        success: false,
+        error: 'La zone existe déjà'
+      });
+    }
+
+    const currentSerial = serial || Math.floor(Date.now() / 1000);
+    const zoneContent = `$TTL 3600
+@   IN  SOA     ns1.${zoneName}. ${soaEmail}. (
+                ${currentSerial}  ; serial
+                3600           ; refresh
+                1800           ; retry
+                604800         ; expire
+                86400 )        ; minimum
+
+@   IN  NS      ns1.${zoneName}.
+@   IN  A       192.168.1.1
+
+ns1 IN  A       192.168.1.1
+`;
+
+    await manager.writeFile(zonePath, zoneContent);
+
+    res.json({
+      success: true,
+      message: `Zone ${zoneName} créée sur ${server.name}`,
+      data: { zoneName, serverId }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    if (manager) await manager.disconnect();
+  }
+});
+
+// POST - Ajouter un enregistrement
+app.post('/api/servers/:serverId/zones/:zoneName/records', async (req, res) => {
+  let manager = null;
+  try {
+    const { serverId, zoneName } = req.params;
+    const { name, type, value, ttl = 3600 } = req.body;
+
+    if (!name || !type || !value) {
+      return res.status(400).json({
+        success: false,
+        error: 'name, type et value requis'
+      });
+    }
+
+    const server = serversManager.getServerById(serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    manager = await getFileManager(serverId);
+    const zonePath = path.join(server.bindZonesPath, zoneName);
+    let content = await manager.readFile(zonePath);
+    const lines = content.split('\n');
+
+    const newRecord = `${name.padEnd(20)} IN  ${type.padEnd(10)} ${value}`;
+    lines.splice(lines.length - 1, 0, newRecord);
+
+    await manager.writeFile(zonePath, lines.join('\n'));
+
+    res.json({
+      success: true,
+      message: 'Enregistrement ajouté',
+      data: { name, type, value, ttl }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    if (manager) await manager.disconnect();
+  }
+});
+
+// DELETE - Supprimer une zone
+app.delete('/api/servers/:serverId/zones/:zoneName', async (req, res) => {
+  let manager = null;
+  try {
+    const { serverId, zoneName } = req.params;
+    const server = serversManager.getServerById(serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    manager = await getFileManager(serverId);
+    const zonePath = path.join(server.bindZonesPath, zoneName);
+    await manager.remove(zonePath);
+
+    res.json({
+      success: true,
+      message: `Zone ${zoneName} supprimée`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    if (manager) await manager.disconnect();
+  }
+});
+
+// DELETE - Supprimer un enregistrement
+app.delete('/api/servers/:serverId/zones/:zoneName/records/:recordId', async (req, res) => {
+  let manager = null;
+  try {
+    const { serverId, zoneName, recordId } = req.params;
+    const server = serversManager.getServerById(serverId);
+    if (!server) {
+      return res.status(404).json({
+        success: false,
+        error: 'Serveur non trouvé'
+      });
+    }
+
+    manager = await getFileManager(serverId);
+    const zonePath = path.join(server.bindZonesPath, zoneName);
+    let content = await manager.readFile(zonePath);
+    const records = parseZoneFile(content);
+
+    const newRecords = records.filter(r => r.id !== recordId);
+
+    if (newRecords.length === records.length) {
+      return res.status(404).json({
+        success: false,
+        error: 'Enregistrement non trouvé'
+      });
+    }
+
+    const newContent = rebuildZoneFile(content, newRecords);
+    await manager.writeFile(zonePath, newContent);
+
+    res.json({
+      success: true,
+      message: 'Enregistrement supprimé'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  } finally {
+    if (manager) await manager.disconnect();
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -374,5 +565,8 @@ app.get('/health', (req, res) => {
 // Démarrer le serveur
 app.listen(PORT, () => {
   console.log(`🚀 DNS Manager API running on port ${PORT}`);
-  console.log(`BIND9 zones path: ${BIND9_ZONES_PATH}`);
+  console.log(`📋 Serveurs configurés: ${serversManager.getAllServers().length}`);
+  serversManager.getAllServers().forEach(s => {
+    console.log(`   - ${s.name} (${s.host})`);
+  });
 });

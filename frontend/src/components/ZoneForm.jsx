@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function ZoneForm({ onCreated }) {
+export default function ZoneForm({ serverId, onCreated }) {
   const [formData, setFormData] = useState({
     zoneName: '',
     soaEmail: '',
@@ -32,7 +32,10 @@ export default function ZoneForm({ onCreated }) {
       setLoading(true);
       setError(null);
 
-      const response = await axios.post(`${API_URL}/api/zones`, formData);
+      const response = await axios.post(
+        `${API_URL}/api/servers/${serverId}/zones`,
+        formData
+      );
 
       if (response.data.success) {
         setSuccess('Zone créée avec succès!');

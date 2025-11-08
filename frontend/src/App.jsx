@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ServerList from './components/ServerList';
+import ServerForm from './components/ServerForm';
 import ZoneList from './components/ZoneList';
 import ZoneDetails from './components/ZoneDetails';
 import ZoneForm from './components/ZoneForm';
@@ -7,33 +9,81 @@ import ZoneForm from './components/ZoneForm';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function App() {
+  const [servers, setServers] = useState([]);
+  const [selectedServer, setSelectedServer] = useState(null);
   const [zones, setZones] = useState([]);
   const [selectedZone, setSelectedZone] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showNewServerForm, setShowNewServerForm] = useState(false);
   const [showNewZoneForm, setShowNewZoneForm] = useState(false);
 
-  // Récupérer la liste des zones
+  // Récupérer les serveurs au démarrage
   useEffect(() => {
-    fetchZones();
+    fetchServers();
   }, []);
 
-  const fetchZones = async () => {
+  // Récupérer les zones quand un serveur est sélectionné
+  useEffect(() => {
+    if (selectedServer) {
+      fetchZones();
+    } else {
+      setZones([]);
+      setSelectedZone(null);
+    }
+  }, [selectedServer]);
+
+  const fetchServers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/zones`);
-      setZones(response.data.data);
+      const response = await axios.get(`${API_URL}/api/servers`);
+      setServers(response.data.data);
       setError(null);
+
+      // Auto-sélectionner le premier serveur
+      if (response.data.data.length > 0 && !selectedServer) {
+        setSelectedServer(response.data.data[0]);
+      }
     } catch (err) {
-      setError('Erreur lors du chargement des zones');
+      setError('Erreur lors du chargement des serveurs');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchZones = async () => {
+    if (!selectedServer) return;
+
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/servers/${selectedServer.id}/zones`
+      );
+      setZones(response.data.data);
+      setSelectedZone(null);
+      setError(null);
+    } catch (err) {
+      setError('Erreur lors du chargement des zones');
+      console.error(err);
+    }
+  };
+
+  const handleServerSelect = (server) => {
+    setSelectedServer(server);
+  };
+
   const handleZoneSelect = (zone) => {
     setSelectedZone(zone);
+  };
+
+  const handleServerCreated = () => {
+    fetchServers();
+    setShowNewServerForm(false);
+  };
+
+  const handleServerDeleted = () => {
+    fetchServers();
+    setSelectedServer(null);
   };
 
   const handleZoneCreated = () => {
@@ -44,51 +94,95 @@ export default function App() {
   return (
     <div>
       <header>
-        <h1>🌐 DNS Manager</h1>
-        <p>Gérez vos zones BIND9 facilement</p>
+        <h1>🌐 DNS Manager Multi-Serveurs</h1>
+        <p>Gérez tous vos serveurs BIND9 depuis une interface centralisée</p>
       </header>
 
       <div className="container">
         <main>
+          {/* Sidebar avec serveurs et zones */}
           <aside className="sidebar">
-            <h2>Zones DNS</h2>
-            <button
-              className="btn-primary"
-              style={{ width: '100%', marginBottom: '15px' }}
-              onClick={() => setShowNewZoneForm(!showNewZoneForm)}
-            >
-              ➕ Nouvelle zone
-            </button>
+            {/* Section Serveurs */}
+            <section className="sidebar-section">
+              <h2>📡 Serveurs DNS</h2>
+              <button
+                className="btn-primary"
+                style={{ width: '100%', marginBottom: '15px' }}
+                onClick={() => setShowNewServerForm(!showNewServerForm)}
+              >
+                ➕ Ajouter un serveur
+              </button>
 
-            {showNewZoneForm && (
-              <ZoneForm onCreated={handleZoneCreated} />
-            )}
+              {showNewServerForm && (
+                <ServerForm onCreated={handleServerCreated} />
+              )}
 
-            {loading ? (
-              <div className="loader"></div>
-            ) : error ? (
-              <div className="alert alert-error">{error}</div>
-            ) : (
-              <ZoneList
-                zones={zones}
-                selectedZone={selectedZone}
-                onSelectZone={handleZoneSelect}
-              />
+              {loading ? (
+                <div className="loader"></div>
+              ) : error ? (
+                <div className="alert alert-error">{error}</div>
+              ) : (
+                <ServerList
+                  servers={servers}
+                  selectedServer={selectedServer}
+                  onSelectServer={handleServerSelect}
+                />
+              )}
+            </section>
+
+            {/* Section Zones */}
+            {selectedServer && (
+              <section className="sidebar-section" style={{ marginTop: '30px' }}>
+                <h2>📋 Zones</h2>
+                <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
+                  Serveur: {selectedServer.name}
+                </p>
+
+                <button
+                  className="btn-primary"
+                  style={{ width: '100%', marginBottom: '15px' }}
+                  onClick={() => setShowNewZoneForm(!showNewZoneForm)}
+                >
+                  ➕ Nouvelle zone
+                </button>
+
+                {showNewZoneForm && (
+                  <ZoneForm
+                    serverId={selectedServer.id}
+                    onCreated={handleZoneCreated}
+                  />
+                )}
+
+                <ZoneList
+                  zones={zones}
+                  selectedZone={selectedZone}
+                  onSelectZone={handleZoneSelect}
+                />
+              </section>
             )}
           </aside>
 
+          {/* Contenu principal */}
           <section className="content">
-            {selectedZone ? (
+            {selectedZone && selectedServer ? (
               <ZoneDetails
                 zone={selectedZone}
+                server={selectedServer}
                 apiUrl={API_URL}
                 onZoneUpdated={fetchZones}
               />
+            ) : selectedServer ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <h2>Bienvenue sur {selectedServer.name}</h2>
+                <p style={{ marginTop: '20px', color: '#999' }}>
+                  Sélectionnez une zone ou créez une nouvelle zone pour commencer.
+                </p>
+              </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '40px' }}>
                 <h2>Bienvenue sur DNS Manager</h2>
                 <p style={{ marginTop: '20px', color: '#999' }}>
-                  Sélectionnez une zone à gauche ou créez une nouvelle zone pour commencer.
+                  Ajoutez un serveur DNS ou sélectionnez un serveur existant pour commencer.
                 </p>
               </div>
             )}

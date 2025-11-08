@@ -1,0 +1,28 @@
+{
+  "servers": [
+    {
+      "id": "server1",
+      "name": "Serveur DNS Principal",
+      "host": "192.168.1.10",
+      "port": 22,
+      "username": "root",
+      "sshKeyPath": "/home/user/.ssh/id_rsa",
+      "bindZonesPath": "/etc/bind/zones",
+      "bindConfigPath": "/etc/bind/named.conf",
+      "enabled": true,
+      "description": "Serveur DNS master en production"
+    },
+    {
+      "id": "server2",
+      "name": "Serveur DNS Secondaire",
+      "host": "192.168.1.20",
+      "port": 22,
+      "username": "root",
+      "sshKeyPath": "/home/user/.ssh/id_rsa",
+      "bindZonesPath": "/etc/bind/zones",
+      "bindConfigPath": "/etc/bind/named.conf",
+      "enabled": true,
+      "description": "Serveur DNS slave/replica"
+    }
+  ]
+}

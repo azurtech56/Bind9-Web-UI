@@ -3,7 +3,7 @@ import axios from 'axios';
 import RecordList from './RecordList';
 import RecordForm from './RecordForm';
 
-export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
+export default function ZoneDetails({ zone, server, apiUrl, onZoneUpdated }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,12 +11,14 @@ export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
 
   useEffect(() => {
     fetchZoneDetails();
-  }, [zone]);
+  }, [zone, server]);
 
   const fetchZoneDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${apiUrl}/api/zones/${zone.name}`);
+      const response = await axios.get(
+        `${apiUrl}/api/servers/${server.id}/zones/${zone.name}`
+      );
       setRecords(response.data.data.records);
       setError(null);
     } catch (err) {
@@ -30,7 +32,7 @@ export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
   const handleRecordAdded = async (newRecord) => {
     try {
       const response = await axios.post(
-        `${apiUrl}/api/zones/${zone.name}/records`,
+        `${apiUrl}/api/servers/${server.id}/zones/${zone.name}/records`,
         newRecord
       );
       if (response.data.success) {
@@ -45,7 +47,7 @@ export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
   const handleRecordDeleted = async (recordId) => {
     try {
       await axios.delete(
-        `${apiUrl}/api/zones/${zone.name}/records/${recordId}`
+        `${apiUrl}/api/servers/${server.id}/zones/${zone.name}/records/${recordId}`
       );
       fetchZoneDetails();
     } catch (err) {
@@ -56,7 +58,7 @@ export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
   const handleZoneDeleted = async () => {
     if (confirm(`Êtes-vous sûr de vouloir supprimer la zone ${zone.name}?`)) {
       try {
-        await axios.delete(`${apiUrl}/api/zones/${zone.name}`);
+        await axios.delete(`${apiUrl}/api/servers/${server.id}/zones/${zone.name}`);
         onZoneUpdated();
       } catch (err) {
         console.error('Erreur:', err);
@@ -67,7 +69,12 @@ export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>Zone: {zone.name}</h2>
+        <div>
+          <h2>{zone.name}</h2>
+          <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
+            📡 Serveur: {server.name}
+          </p>
+        </div>
         <div>
           <button
             className="btn-primary"
@@ -79,7 +86,6 @@ export default function ZoneDetails({ zone, apiUrl, onZoneUpdated }) {
           <button
             className="btn-danger"
             onClick={handleZoneDeleted}
-            style={{ marginRight: '10px' }}
           >
             🗑️ Supprimer la zone
           </button>
