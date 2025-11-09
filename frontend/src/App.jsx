@@ -168,7 +168,6 @@ export default function App() {
               <ZoneDetails
                 zone={selectedZone}
                 server={selectedServer}
-                apiUrl={API_URL}
                 onZoneUpdated={fetchZones}
               />
             ) : selectedServer ? (

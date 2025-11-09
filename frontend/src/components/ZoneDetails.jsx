@@ -3,7 +3,7 @@ import axios from 'axios';
 import RecordList from './RecordList';
 import RecordForm from './RecordForm';
 
-export default function ZoneDetails({ zone, server, apiUrl, onZoneUpdated }) {
+export default function ZoneDetails({ zone, server, onZoneUpdated }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,7 +17,7 @@ export default function ZoneDetails({ zone, server, apiUrl, onZoneUpdated }) {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${apiUrl}/api/servers/${server.id}/zones/${zone.name}`
+        `/api/servers/${server.id}/zones/${zone.name}`
       );
       setRecords(response.data.data.records);
       setError(null);
@@ -32,7 +32,7 @@ export default function ZoneDetails({ zone, server, apiUrl, onZoneUpdated }) {
   const handleRecordAdded = async (newRecord) => {
     try {
       const response = await axios.post(
-        `${apiUrl}/api/servers/${server.id}/zones/${zone.name}/records`,
+        `/api/servers/${server.id}/zones/${zone.name}/records`,
         newRecord
       );
       if (response.data.success) {
@@ -47,7 +47,7 @@ export default function ZoneDetails({ zone, server, apiUrl, onZoneUpdated }) {
   const handleRecordDeleted = async (recordId) => {
     try {
       await axios.delete(
-        `${apiUrl}/api/servers/${server.id}/zones/${zone.name}/records/${recordId}`
+        `/api/servers/${server.id}/zones/${zone.name}/records/${recordId}`
       );
       fetchZoneDetails();
     } catch (err) {
@@ -58,7 +58,7 @@ export default function ZoneDetails({ zone, server, apiUrl, onZoneUpdated }) {
   const handleZoneDeleted = async () => {
     if (confirm(`Êtes-vous sûr de vouloir supprimer la zone ${zone.name}?`)) {
       try {
-        await axios.delete(`${apiUrl}/api/servers/${server.id}/zones/${zone.name}`);
+        await axios.delete(`/api/servers/${server.id}/zones/${zone.name}`);
         onZoneUpdated();
       } catch (err) {
         console.error('Erreur:', err);
