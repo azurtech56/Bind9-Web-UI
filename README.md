@@ -221,7 +221,7 @@ dns-manager/
 
 ```bash
 # 1. Cloner le repo
-git clone https://github.com/votre-repo/dns-manager.git
+git clone https://github.com/azurtech56/Bind9-Web-UI.git
 cd dns-manager
 
 # 2. Configurer les variables d'environnement

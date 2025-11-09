@@ -39,7 +39,7 @@ docker-compose --version
 #### 1.2 Cloner et configurer
 ```bash
 # Cloner le projet
-git clone <repo-url> /opt/dns-manager
+git clone https://github.com/azurtech56/Bind9-Web-UI.git /opt/dns-manager
 cd /opt/dns-manager
 
 # Copier l'environnement

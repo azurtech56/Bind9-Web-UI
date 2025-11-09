@@ -19,7 +19,7 @@ Votre application DNS Manager est **complètement prête** pour le déploiement!
 
 ```bash
 # Cloner le projet
-git clone <votre-repo> /opt/dns-manager
+git clone https://github.com/azurtech56/Bind9-Web-UI.git /opt/dns-manager
 cd /opt/dns-manager
 
 # Générer les clés SSH (une seule fois)

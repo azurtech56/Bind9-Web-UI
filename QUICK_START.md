@@ -13,8 +13,8 @@ Démarrez en 5 minutes!
 
 ```bash
 # Clone le repo
-git clone https://github.com/azurtech56/dns-manager.git
-cd dns-manager
+git clone https://github.com/azurtech56/Bind9-Web-UI.git
+cd Bind9-Web-UI
 
 # Configure les permissions BIND9
 sudo chown -R 1000:1000 /etc/bind/zones

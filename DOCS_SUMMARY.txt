@@ -58,10 +58,10 @@ PROJECT STATUS: ✅ PRODUCTION READY
 ✅ COMMANDS & EXAMPLES
   • docker-compose up -d
   • curl http://localhost:3001/health
-  • ssh -i /etc/dns-manager/ssh-keys/...
+  • ssh -i /etc/Bind9-Web-UI/ssh-keys/...
 
 ⚠️ REPOSITORY URL
-  • azurtech56/dns-manager used in QUICK_START
+  • azurtech56/Bind9-Web-UI used in QUICK_START
   • Generic <repo-url> used in other docs
 
 ================================================================================
@@ -176,7 +176,7 @@ Testing:
 🔗 QUICK LINKS
 ================================================================================
 
-Repository:     https://github.com/azurtech56/dns-manager.git
+Repository:     https://github.com/azurtech56/Bind9-Web-UI.git
 Main Guide:     See README.md
 Quick Start:    See QUICK_START.md
 Architecture:   See DISTRIBUTED_SETUP.md

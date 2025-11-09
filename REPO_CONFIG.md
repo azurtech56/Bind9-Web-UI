@@ -2,11 +2,11 @@
 
 ## 📍 Repository GitHub
 
-**URL du projet:** `https://github.com/azurtech56/dns-manager.git`
+**URL du projet:** `https://github.com/azurtech56/Bind9-Web-UI.git`
 
 ### Si vous avez un repository différent
 
-Remplacez `https://github.com/azurtech56/dns-manager.git` par votre URL dans les fichiers suivants :
+Remplacez `https://github.com/azurtech56/Bind9-Web-UI.git` par votre URL dans les fichiers suivants :
 
 ```bash
 # Fichiers à mettre à jour:
@@ -20,17 +20,17 @@ Remplacez `https://github.com/azurtech56/dns-manager.git` par votre URL dans les
 
 **Avec HTTPS:**
 ```bash
-git clone https://github.com/azurtech56/dns-manager.git /opt/dns-manager
+git clone https://github.com/azurtech56/Bind9-Web-UI.git /opt/Bind9-Web-UI
 ```
 
 **Avec SSH (si clé SSH configurée):**
 ```bash
-git clone git@github.com:azurtech56/dns-manager.git /opt/dns-manager
+git clone git@github.com:azurtech56/Bind9-Web-UI.git /opt/Bind9-Web-UI
 ```
 
 **Avec token (pour private repo):**
 ```bash
-git clone https://username:token@github.com/azurtech56/dns-manager.git /opt/dns-manager
+git clone https://username:token@github.com/azurtech56/Bind9-Web-UI.git /opt/Bind9-Web-UI
 ```
 
 ## 📋 Informations du Repository
@@ -38,9 +38,9 @@ git clone https://username:token@github.com/azurtech56/dns-manager.git /opt/dns-
 | Info | Valeur |
 |------|--------|
 | **Propriétaire** | azurtech56 |
-| **Nom du repo** | dns-manager |
-| **URL HTTP** | https://github.com/azurtech56/dns-manager.git |
-| **URL SSH** | git@github.com:azurtech56/dns-manager.git |
+| **Nom du repo** | Bind9-Web-UI |
+| **URL HTTP** | https://github.com/azurtech56/Bind9-Web-UI.git |
+| **URL SSH** | git@github.com:azurtech56/Bind9-Web-UI.git |
 | **Branche principale** | main (ou master) |
 | **Licence** | MIT |
 
@@ -49,7 +49,7 @@ git clone https://username:token@github.com/azurtech56/dns-manager.git /opt/dns-
 Pour mettre à jour depuis le repository :
 
 ```bash
-cd /opt/dns-manager
+cd /opt/Bind9-Web-UI
 git fetch origin
 git pull origin main  # ou master
 docker-compose build --no-cache
