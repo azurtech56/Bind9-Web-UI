@@ -6,8 +6,6 @@ import ZoneList from './components/ZoneList';
 import ZoneDetails from './components/ZoneDetails';
 import ZoneForm from './components/ZoneForm';
 
-const API_URL = '';
-
 export default function App() {
   const [servers, setServers] = useState([]);
   const [selectedServer, setSelectedServer] = useState(null);
@@ -36,7 +34,7 @@ export default function App() {
   const fetchServers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/servers`);
+      const response = await axios.get(`/api/servers`);
       setServers(response.data.data);
       setError(null);
 
@@ -57,7 +55,7 @@ export default function App() {
 
     try {
       const response = await axios.get(
-        `${API_URL}/api/servers/${selectedServer.id}/zones`
+        `/api/servers/${selectedServer.id}/zones`
       );
       setZones(response.data.data);
       setSelectedZone(null);

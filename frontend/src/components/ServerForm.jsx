@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = '';
-
 export default function ServerForm({ onCreated }) {
   const [formData, setFormData] = useState({
     id: '',
@@ -37,14 +35,14 @@ export default function ServerForm({ onCreated }) {
     try {
       setTesting(true);
       const response = await axios.post(
-        `${API_URL}/api/servers`,
+        `/api/servers`,
         formData
       );
 
       if (response.data.success) {
         // Tester la connexion
         const testResponse = await axios.post(
-          `${API_URL}/api/servers/${formData.id}/test`
+          `/api/servers/${formData.id}/test`
         );
 
         if (testResponse.data.success) {
@@ -72,7 +70,7 @@ export default function ServerForm({ onCreated }) {
       setLoading(true);
       setError(null);
 
-      const response = await axios.post(`${API_URL}/api/servers`, formData);
+      const response = await axios.post(`/api/servers`, formData);
 
       if (response.data.success) {
         setSuccess('Serveur ajouté avec succès!');
