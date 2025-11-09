@@ -18,6 +18,8 @@ services:
       # Montage des fichiers BIND9 du serveur hôte
       - /etc/bind:/etc/bind:rw
       - /var/lib/bind:/var/lib/bind:rw
+      # Montage de la configuration des serveurs
+      - ./backend/servers.config.json:/app/servers.config.json:rw
     networks:
       - dns-network
     restart: unless-stopped
