@@ -13,7 +13,7 @@ Démarrez en 5 minutes!
 
 ```bash
 # Clone le repo
-git clone https://github.com/votre-repo/dns-manager.git
+git clone https://github.com/azurtech56/dns-manager.git
 cd dns-manager
 
 # Configure les permissions BIND9

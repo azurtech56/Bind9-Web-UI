@@ -2,8 +2,9 @@
 node_modules/
 npm-debug.log
 yarn-error.log
-package-lock.json
-yarn.lock
+
+# Note: package-lock.json and yarn.lock are INCLUDED (needed for Docker builds)
+# They should be committed to git
 
 # Environment variables
 .env
