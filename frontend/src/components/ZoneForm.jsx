@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-export default function ZoneForm({ serverId, onCreated }) {
+export default function ZoneForm({ onCreated }) {
   const [formData, setFormData] = useState({
     zoneName: '',
     soaEmail: '',
@@ -31,7 +31,7 @@ export default function ZoneForm({ serverId, onCreated }) {
       setError(null);
 
       const response = await axios.post(
-        `/api/servers/${serverId}/zones`,
+        `/api/zones`,
         formData
       );
 

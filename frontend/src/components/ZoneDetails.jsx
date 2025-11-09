@@ -3,7 +3,7 @@ import axios from 'axios';
 import RecordList from './RecordList';
 import RecordForm from './RecordForm';
 
-export default function ZoneDetails({ zone, server, onZoneUpdated }) {
+export default function ZoneDetails({ zone, onZoneUpdated }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,13 +11,13 @@ export default function ZoneDetails({ zone, server, onZoneUpdated }) {
 
   useEffect(() => {
     fetchZoneDetails();
-  }, [zone, server]);
+  }, [zone]);
 
   const fetchZoneDetails = async () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `/api/servers/${server.id}/zones/${zone.name}`
+        `/api/zones/${zone.name}`
       );
       setRecords(response.data.data.records);
       setError(null);
@@ -32,7 +32,7 @@ export default function ZoneDetails({ zone, server, onZoneUpdated }) {
   const handleRecordAdded = async (newRecord) => {
     try {
       const response = await axios.post(
-        `/api/servers/${server.id}/zones/${zone.name}/records`,
+        `/api/zones/${zone.name}/records`,
         newRecord
       );
       if (response.data.success) {
@@ -47,7 +47,7 @@ export default function ZoneDetails({ zone, server, onZoneUpdated }) {
   const handleRecordDeleted = async (recordId) => {
     try {
       await axios.delete(
-        `/api/servers/${server.id}/zones/${zone.name}/records/${recordId}`
+        `/api/zones/${zone.name}/records/${recordId}`
       );
       fetchZoneDetails();
     } catch (err) {
@@ -58,7 +58,7 @@ export default function ZoneDetails({ zone, server, onZoneUpdated }) {
   const handleZoneDeleted = async () => {
     if (confirm(`Êtes-vous sûr de vouloir supprimer la zone ${zone.name}?`)) {
       try {
-        await axios.delete(`/api/servers/${server.id}/zones/${zone.name}`);
+        await axios.delete(`/api/zones/${zone.name}`);
         onZoneUpdated();
       } catch (err) {
         console.error('Erreur:', err);
@@ -72,7 +72,7 @@ export default function ZoneDetails({ zone, server, onZoneUpdated }) {
         <div>
           <h2>{zone.name}</h2>
           <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
-            📡 Serveur: {server.name}
+            📡 Zone locale BIND9
           </p>
         </div>
         <div>
