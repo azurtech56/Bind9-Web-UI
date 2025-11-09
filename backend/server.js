@@ -133,6 +133,37 @@ function parseReverseZoneFile(content) {
   return records;
 }
 
+/**
+ * Reconstruire le fichier de zone inverse
+ */
+function rebuildReverseZoneFile(originalContent, records) {
+  const lines = originalContent.split('\n');
+  const newLines = [];
+
+  let soaFound = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.includes('SOA') || line.startsWith('$')) {
+      newLines.push(line);
+      soaFound = true;
+    } else if (soaFound && (trimmed === '' || trimmed.startsWith(';'))) {
+      newLines.push(line);
+    } else if (soaFound && (trimmed.includes('NS') || trimmed.includes('PTR'))) {
+      // Arrêter à la première ligne de record (NS ou PTR)
+      break;
+    }
+  }
+
+  // Ajouter tous les records (NS et PTR)
+  records.forEach(record => {
+    newLines.push(
+      `${record.name.padEnd(20)} IN  ${record.type.padEnd(10)} ${record.value}`
+    );
+  });
+
+  return newLines.join('\n');
+}
+
 // ============================================
 // ROUTES API
 // ============================================
@@ -635,7 +666,7 @@ app.delete('/api/reverse-zones/:zoneName/records/:recordId', async (req, res) =>
       });
     }
 
-    const newContent = rebuildZoneFile(content, newRecords);
+    const newContent = rebuildReverseZoneFile(content, newRecords);
     await fs.writeFile(zonePath, newContent);
 
     res.json({
