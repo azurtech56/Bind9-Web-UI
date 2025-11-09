@@ -6,7 +6,7 @@ import ZoneList from './components/ZoneList';
 import ZoneDetails from './components/ZoneDetails';
 import ZoneForm from './components/ZoneForm';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = '';
 
 export default function App() {
   const [servers, setServers] = useState([]);
