@@ -142,12 +142,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'DNS Manager API is running' });
 });
 
-// GET - Lister toutes les zones
+// GET - Lister toutes les zones (zones normales uniquement, pas les inverses)
 app.get('/api/zones', async (req, res) => {
   try {
     const files = await fs.readdir(BIND_ZONES_PATH);
     const zones = files
-      .filter(f => !f.startsWith('.') && !f.endsWith('.jnl'))
+      .filter(f => !f.startsWith('.') && !f.endsWith('.jnl') && !isValidReverseZone(f))
       .map(zone => ({
         name: zone
       }));
